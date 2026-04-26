@@ -221,6 +221,37 @@ export default function PlanPage() {
             </div>
           )}
 
+          {plan.literatureQc && (
+            <div className="mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface-panel)] p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">
+                    Literature QC Decision
+                  </div>
+                  <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
+                    {plan.noveltySignal}
+                  </h2>
+                </div>
+                <div className="rounded border border-[var(--accent-border)]/30 bg-[var(--accent-text)]/10 px-3 py-2 font-mono text-[11px] text-[var(--accent-text)]">
+                  Top match {plan.literatureQc.topMatchScore}%
+                </div>
+              </div>
+              <p className="mt-3 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+                {plan.literatureQc.rationale}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {plan.literatureQc.decisionFactors.map((factor) => (
+                  <span
+                    key={factor}
+                    className="rounded border border-[var(--border)] bg-[var(--content-bg)] px-2 py-1 font-mono text-[10px] text-[var(--text-tertiary)]"
+                  >
+                    {factor}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Signals */}
           {plan.signals?.length > 0 && (
             <div className="flex gap-3 mb-6 overflow-x-auto pb-1">
@@ -267,6 +298,14 @@ export default function PlanPage() {
             <section id="materials">
               <SectionHeader id="materials" label="Materials & Reagents" icon="science" onFeedback={openFeedback} />
               <div className="bg-[var(--surface-panel)] border border-[var(--border)] rounded-xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--surface-muted)] flex items-center justify-between gap-3">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
+                    Supply-chain grounding
+                  </span>
+                  <span className="font-mono text-[10px] text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-2 py-1 rounded">
+                    {plan.materials.filter((material) => material.verificationStatus === "verified").length}/{plan.materials.length} verified
+                  </span>
+                </div>
                 <div className="grid grid-cols-[2fr_1.5fr_1.5fr_1fr_1fr] gap-4 px-5 py-3 border-b border-[var(--border)]">
                   {["REAGENT", "SUPPLIER", "CAT #", "QTY", "EST. COST"].map((h) => (
                     <span key={h} className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-muted)]">{h}</span>
@@ -274,9 +313,32 @@ export default function PlanPage() {
                 </div>
                 {plan.materials.map((m, i) => (
                   <div key={i} className="grid grid-cols-[2fr_1.5fr_1.5fr_1fr_1fr] gap-4 px-5 py-3 border-b border-[var(--border)] last:border-0 items-center">
-                    <span className="text-[12px] font-medium text-[var(--text-primary)]">{m.name}</span>
-                    <span className="text-[12px] text-[var(--text-secondary)]">{m.supplier}</span>
-                    <span className="font-mono text-[11px] text-[var(--accent-strong)]">{m.catalogNumber}</span>
+                    <div>
+                      <span className="text-[12px] font-medium text-[var(--text-primary)]">{m.name}</span>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        <span
+                          className={`font-mono text-[9px] px-1.5 py-0.5 rounded border ${
+                            m.verificationStatus === "verified"
+                              ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/20"
+                              : "text-[var(--text-muted)] bg-[var(--content-bg)] border-[var(--border)]"
+                          }`}
+                        >
+                          {m.verificationStatus === "verified" ? "Verified catalog match" : "Estimated"}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[12px] text-[var(--text-secondary)]">{m.supplier}</span>
+                      {m.verificationSource ? (
+                        <div className="mt-1 text-[10px] text-[var(--text-muted)]">{m.verificationSource}</div>
+                      ) : null}
+                    </div>
+                    <div>
+                      <span className="font-mono text-[11px] text-[var(--accent-strong)]">{m.catalogNumber}</span>
+                      {m.verificationNote ? (
+                        <div className="mt-1 text-[10px] text-[var(--text-muted)] leading-snug">{m.verificationNote}</div>
+                      ) : null}
+                    </div>
                     <span className="font-mono text-[11px] text-[var(--text-tertiary)]">{m.quantity}</span>
                     <span className="font-mono text-[11px] text-[var(--accent-text)]">{m.estimatedCost}</span>
                   </div>
@@ -350,14 +412,33 @@ export default function PlanPage() {
                     const badge = REF_BADGE[ref.type] ?? REF_BADGE.similarity;
                     return (
                       <div key={i} className="bg-[var(--surface-panel)] border border-[var(--border)] rounded-xl px-4 py-3">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border ${badge.bg} ${badge.border} ${badge.text}`}>
                             {ref.type.toUpperCase()}
                           </span>
                           <span className="font-mono text-[10px] text-[var(--text-muted)]">{ref.source}</span>
+                          {typeof ref.matchScore === "number" ? (
+                            <span className="font-mono text-[10px] text-[var(--accent-text)] bg-[var(--accent-text)]/10 border border-[var(--accent-border)]/20 px-1.5 py-0.5 rounded">
+                              {ref.matchScore}% match
+                            </span>
+                          ) : null}
                         </div>
                         <div className="text-[13px] font-medium text-[var(--text-primary)] mb-1">{ref.title}</div>
-                        <div className="text-[11px] text-[var(--text-tertiary)]">{ref.note}</div>
+                        <div className="text-[11px] text-[var(--text-tertiary)]">
+                          {ref.matchRationale ?? ref.note}
+                        </div>
+                        {ref.matchedTerms?.length ? (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {ref.matchedTerms.map((term) => (
+                              <span
+                                key={`${ref.doi}-${term}`}
+                                className="rounded border border-[var(--border)] bg-[var(--content-bg)] px-2 py-1 font-mono text-[10px] text-[var(--text-muted)]"
+                              >
+                                {term}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })}

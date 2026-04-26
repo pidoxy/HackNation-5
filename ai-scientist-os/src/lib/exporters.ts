@@ -26,7 +26,7 @@ export function exportPlanAsMarkdown({
   const materials = plan.materials
     .map(
       (item) =>
-        `- **${item.name}** | ${item.supplier} | ${item.catalogNumber} | ${item.quantity} | ${item.estimatedCost}`,
+        `- **${item.name}** | ${item.supplier} | ${item.catalogNumber} | ${item.quantity} | ${item.estimatedCost} | ${item.verificationStatus === "verified" ? "verified" : "estimated"}${item.verificationSource ? ` | ${item.verificationSource}` : ""}`,
     )
     .join("\n");
 
@@ -68,6 +68,10 @@ ${parsedFields}
 ## Literature Quality Control
 
 - **Novelty Signal:** ${plan.noveltySignal}
+- **Top Match Score:** ${plan.literatureQc?.topMatchScore ?? "N/A"}%
+- **QC Rationale:** ${plan.literatureQc?.rationale ?? "No explicit QC rationale available."}
+
+${plan.literatureQc?.decisionFactors.map((item) => `- ${item}`).join("\n") ?? ""}
 
 ${references}
 

@@ -13,6 +13,18 @@ export interface Reference {
   source: string;
   doi: string;
   note: string;
+  matchScore?: number;
+  matchedTerms?: string[];
+  matchRationale?: string;
+}
+
+export interface LiteratureQcSummary {
+  query: string;
+  rationale: string;
+  topMatchScore: number;
+  exactMatchThreshold: number;
+  similarMatchThreshold: number;
+  decisionFactors: string[];
 }
 
 export interface CitationItem {
@@ -35,6 +47,9 @@ export interface MaterialItem {
   catalogNumber: string;
   quantity: string;
   estimatedCost: string;
+  verificationStatus?: "verified" | "estimated";
+  verificationSource?: string;
+  verificationNote?: string;
 }
 
 export interface BudgetItem {
@@ -93,6 +108,7 @@ export interface ExperimentPlan {
   reviewFeedback: ReviewFeedbackItem[];
   signals: SignalItem[];
   sectionCitations: Record<RegenerableSection, CitationItem[]>;
+  literatureQc?: LiteratureQcSummary;
 }
 
 export interface ParseHypothesisResponse {

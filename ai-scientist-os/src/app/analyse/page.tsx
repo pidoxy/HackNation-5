@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopNav from "@/components/TopNav";
 import SideNav from "@/components/SideNav";
-import type { GeneratePlanResponse, ParseHypothesisResponse, ReviewMemoryItem } from "@/lib/types";
+import type {
+  GeneratePlanResponse,
+  LiteratureQcSummary,
+  ParseHypothesisResponse,
+  Reference,
+  ReviewMemoryItem,
+} from "@/lib/types";
 
 const STATUS_MESSAGES = [
   "Analysing hypothesis...",
@@ -65,6 +71,8 @@ export default function AnalysePage() {
   const [planReady, setPlanReady] = useState(false);
   const [novelty, setNovelty] = useState<keyof typeof NOVELTY_CONFIG | null>(null);
   const [refCount, setRefCount] = useState(0);
+  const [references, setReferences] = useState<Reference[]>([]);
+  const [literatureQc, setLiteratureQc] = useState<LiteratureQcSummary | null>(null);
   const [memoryCount, setMemoryCount] = useState(0);
   const [statusIdx, setStatusIdx] = useState(0);
   const [logLines, setLogLines] = useState<{ time: string; text: string }[]>([
@@ -150,6 +158,8 @@ export default function AnalysePage() {
         const plan = data.plan;
         setNovelty(plan.noveltySignal as keyof typeof NOVELTY_CONFIG);
         setRefCount(plan.references.length);
+        setReferences(plan.references.slice(0, 3));
+        setLiteratureQc(plan.literatureQc ?? null);
 
         // Store plan and hypothesis for plan page
         sessionStorage.setItem("plan", JSON.stringify(plan));
@@ -194,12 +204,6 @@ export default function AnalysePage() {
 
     run();
   }, [hypothesis]);
-
-  useEffect(() => {
-    if (!loading && planReady) {
-      setTimeout(() => router.push("/plan"), 1000);
-    }
-  }, [loading, planReady, router]);
 
   const noveltyConfig = novelty ? NOVELTY_CONFIG[novelty] : null;
 
@@ -285,11 +289,74 @@ export default function AnalysePage() {
                       <span className={`w-2 h-2 rounded-full ${noveltyConfig.dot}`} />
                       <span className={`font-mono text-[11px] uppercase tracking-widest ${noveltyConfig.color}`}>{noveltyConfig.label}</span>
                     </div>
+                    {literatureQc ? (
+                      <div className="rounded border border-[var(--border)] bg-[var(--content-bg)] p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
+                            Explicit QC
+                          </span>
+                          <span className="font-mono text-[11px] text-[var(--accent-text)]">
+                            Top match {literatureQc.topMatchScore}%
+                          </span>
+                        </div>
+                        <p className="mt-2 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+                          {literatureQc.rationale}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {literatureQc.decisionFactors.map((factor) => (
+                            <span
+                              key={factor}
+                              className="rounded border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-1 font-mono text-[10px] text-[var(--text-tertiary)]"
+                            >
+                              {factor}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     {refCount > 0 ? (
-                      <div className="flex flex-col items-center justify-center py-8 gap-2">
-                        <span className="material-symbols-outlined text-[var(--accent-text)] text-[28px]">article</span>
-                        <p className="font-mono text-[12px] text-[var(--text-tertiary)]">{refCount} reference{refCount > 1 ? "s" : ""} surfaced</p>
-                        <p className="text-[11px] text-[var(--text-muted)] font-mono">Embedded in experiment plan</p>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between rounded border border-[var(--border)] bg-[var(--content-bg)] px-3 py-2">
+                          <p className="font-mono text-[12px] text-[var(--text-tertiary)]">
+                            {refCount} reference{refCount > 1 ? "s" : ""} surfaced
+                          </p>
+                          <p className="text-[11px] text-[var(--text-muted)] font-mono">Ranked by overlap</p>
+                        </div>
+                        {references.map((reference) => (
+                          <article
+                            key={`${reference.doi}-${reference.title}`}
+                            className="rounded border border-[var(--border)] bg-[var(--content-bg)] p-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
+                                  {reference.type}
+                                </div>
+                                <h3 className="mt-1 text-[12px] font-semibold leading-snug text-[var(--text-primary)]">
+                                  {reference.title}
+                                </h3>
+                              </div>
+                              <span className="rounded border border-[var(--accent-border)]/30 bg-[var(--accent-text)]/10 px-2 py-1 font-mono text-[10px] text-[var(--accent-text)]">
+                                {reference.matchScore ?? 0}%
+                              </span>
+                            </div>
+                            <p className="mt-2 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                              {reference.matchRationale ?? reference.note}
+                            </p>
+                            {reference.matchedTerms?.length ? (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {reference.matchedTerms.map((term) => (
+                                  <span
+                                    key={`${reference.doi}-${term}`}
+                                    className="rounded border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-1 font-mono text-[10px] text-[var(--text-tertiary)]"
+                                  >
+                                    {term}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                          </article>
+                        ))}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
@@ -328,7 +395,7 @@ export default function AnalysePage() {
                   </div>
 
                   <div className="font-mono text-[13px] text-[var(--accent-text)] mb-6 h-5 text-center">
-                    {loading ? STATUS_MESSAGES[statusIdx] : planReady ? "Plan generated — redirecting..." : error ?? ""}
+                    {loading ? STATUS_MESSAGES[statusIdx] : planReady ? "Plan generated — review the QC results below." : error ?? ""}
                   </div>
 
                   <div className="w-full h-px bg-[var(--border-subtle)] rounded-full overflow-hidden relative mb-8">

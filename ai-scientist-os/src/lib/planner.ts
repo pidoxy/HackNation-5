@@ -4,6 +4,11 @@ import {
 } from "@/lib/mock-engine";
 import { buildSectionCitations } from "@/lib/citations";
 import { getLabSettings } from "@/lib/lab-settings-store";
+import {
+  assessLiteratureQuality,
+  mergeLiteratureSignals,
+} from "@/lib/literature-qc";
+import { groundPlanMaterials } from "@/lib/material-catalog";
 import { strengthenGeneratedPlan } from "@/lib/planning-guards";
 import {
   generatePlanWithOpenAI,
@@ -30,7 +35,7 @@ function normalizeReferences(references: Reference[]): string {
   return references
     .map(
       (reference, index) =>
-        `${index + 1}. [${reference.type}] ${reference.title} | ${reference.source} | ${reference.doi}\n${reference.note}`,
+        `${index + 1}. [${reference.type}] ${reference.title} | ${reference.source} | ${reference.doi}\n${reference.note}\nMatch score: ${reference.matchScore ?? "n/a"}%\nRationale: ${reference.matchRationale ?? "No QC rationale available."}`,
     )
     .join("\n\n");
 }
@@ -59,48 +64,77 @@ export async function generateExperimentPlanner(
     const resolvedLabSettings = labSettings ?? (await getLabSettings());
     const parsed = await parseHypothesisPlanner(hypothesis);
     const references = await searchScientificReferences(hypothesis, parsed);
+    const literatureQc = assessLiteratureQuality({
+      hypothesis,
+      parsed,
+      references,
+    });
 
     const livePlan = await generatePlanWithOpenAI(
       hypothesis,
       parsed,
-      normalizeReferences(references),
+      normalizeReferences(literatureQc.references),
       reviewMemory,
       resolvedLabSettings,
       experimentPlanSchema,
     );
-    const groundedReferences = references.length > 0 ? references : livePlan.references;
+    const groundedReferences =
+      literatureQc.references.length > 0 ? literatureQc.references : livePlan.references;
     const strengthenedPlan = strengthenGeneratedPlan(livePlan, parsed, groundedReferences);
+    const catalogGroundedPlan = groundPlanMaterials(strengthenedPlan, parsed);
 
     return {
       plan: {
-        ...strengthenedPlan,
+        ...catalogGroundedPlan,
         parsedFields: parsed.parsedFields,
+        noveltySignal: literatureQc.noveltySignal,
         references: groundedReferences,
+        literatureQc: literatureQc.summary,
         reviewFeedback:
           reviewMemory.length > 0
-            ? [...reviewMemory.slice(0, 2), ...strengthenedPlan.reviewFeedback].slice(0, 4)
-            : strengthenedPlan.reviewFeedback,
+            ? [...reviewMemory.slice(0, 2), ...catalogGroundedPlan.reviewFeedback].slice(0, 4)
+            : catalogGroundedPlan.reviewFeedback,
+        signals: mergeLiteratureSignals(
+          catalogGroundedPlan.signals,
+          literatureQc.summary,
+          literatureQc.noveltySignal,
+        ),
         sectionCitations: buildSectionCitations(
           groundedReferences,
         ),
       },
     };
   } catch {
+    const parsedFallback = parseMockHypothesis(hypothesis);
     const filteredMemory = reviewMemory.filter(
       (item) =>
         item.domain.toLowerCase() === fallback.plan.domain.toLowerCase() ||
-        item.domain.toLowerCase() === parseMockHypothesis(hypothesis).domain.toLowerCase(),
+        item.domain.toLowerCase() === parsedFallback.domain.toLowerCase(),
     );
+    const literatureQc = assessLiteratureQuality({
+      hypothesis,
+      parsed: parsedFallback,
+      references: fallback.plan.references,
+    });
+    const catalogGroundedPlan = groundPlanMaterials(fallback.plan, parsedFallback);
 
     return {
       plan: {
-        ...fallback.plan,
+        ...catalogGroundedPlan,
         generationMode: "fallback",
+        noveltySignal: literatureQc.noveltySignal,
+        references: literatureQc.references,
+        literatureQc: literatureQc.summary,
         reviewFeedback:
           filteredMemory.length > 0
-            ? [...filteredMemory.slice(0, 2), ...fallback.plan.reviewFeedback].slice(0, 4)
-            : fallback.plan.reviewFeedback,
-        sectionCitations: buildSectionCitations(fallback.plan.references),
+            ? [...filteredMemory.slice(0, 2), ...catalogGroundedPlan.reviewFeedback].slice(0, 4)
+            : catalogGroundedPlan.reviewFeedback,
+        signals: mergeLiteratureSignals(
+          catalogGroundedPlan.signals,
+          literatureQc.summary,
+          literatureQc.noveltySignal,
+        ),
+        sectionCitations: buildSectionCitations(literatureQc.references),
       },
     };
   }
@@ -126,6 +160,11 @@ export async function regenerateSectionPlanner({
   try {
     const resolvedLabSettings = labSettings ?? (await getLabSettings());
     const references = await searchScientificReferences(hypothesis, parsed);
+    const literatureQc = assessLiteratureQuality({
+      hypothesis,
+      parsed,
+      references: references.length > 0 ? references : plan.references,
+    });
     const regeneratedSection = await regeneratePlanSectionWithOpenAI<
       GeneratePlanResponse["plan"][RegenerableSection]
     >({
@@ -133,34 +172,65 @@ export async function regenerateSectionPlanner({
       hypothesis,
       parsedHypothesis: parsed,
       currentPlan: plan,
-      referencesContext: normalizeReferences(references.length > 0 ? references : plan.references),
+      referencesContext: normalizeReferences(literatureQc.references),
       reviewMemory,
       labSettings: resolvedLabSettings,
       schema: sectionSchemas[section],
     });
+    const nextPlan = groundPlanMaterials(
+      {
+        ...plan,
+        [section]: regeneratedSection,
+      },
+      parsed,
+    );
 
     return {
       plan: {
-        ...plan,
-        [section]: regeneratedSection,
+        ...nextPlan,
         generationMode: "live",
+        noveltySignal: literatureQc.noveltySignal,
+        references: literatureQc.references,
+        literatureQc: literatureQc.summary,
+        signals: mergeLiteratureSignals(
+          nextPlan.signals,
+          literatureQc.summary,
+          literatureQc.noveltySignal,
+        ),
         sectionCitations: {
           ...plan.sectionCitations,
-          [section]: buildSectionCitations(
-            references.length > 0 ? references : plan.references,
-          )[section],
+          [section]: buildSectionCitations(literatureQc.references)[section],
         },
       },
     };
   } catch {
-    return {
-      plan: {
+    const literatureQc = assessLiteratureQuality({
+      hypothesis,
+      parsed,
+      references: fallbackPlan.references,
+    });
+    const nextPlan = groundPlanMaterials(
+      {
         ...plan,
         [section]: fallbackPlan[section],
+      },
+      parsed,
+    );
+    return {
+      plan: {
+        ...nextPlan,
         generationMode: "fallback",
+        noveltySignal: literatureQc.noveltySignal,
+        references: literatureQc.references,
+        literatureQc: literatureQc.summary,
+        signals: mergeLiteratureSignals(
+          nextPlan.signals,
+          literatureQc.summary,
+          literatureQc.noveltySignal,
+        ),
         sectionCitations: {
           ...plan.sectionCitations,
-          [section]: fallbackPlan.sectionCitations[section],
+          [section]: buildSectionCitations(literatureQc.references)[section],
         },
       },
     };
