@@ -1,0 +1,212 @@
+[
+  {
+    "id": "diag-crp-origami-2022",
+    "domain": "Diagnostics",
+    "title": "Multifunctional self-driven origami paper-based integrated microfluidic chip to detect CRP and PAB in whole blood",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/35358776/",
+    "doi": "10.1016/j.bios.2022.114225",
+    "year": 2022,
+    "hypothesis": "A self-driven paper-based microfluidic biosensor functionalized for C-reactive protein detection will quantify CRP directly from whole blood without preprocessing in a point-of-care workflow, while preserving clinically useful sensitivity and turnaround time.",
+    "expectedNoveltySignals": [
+      "exact match found",
+      "similar work exists"
+    ],
+    "expectedReferenceKeywords": [
+      "c-reactive protein",
+      "whole blood",
+      "paper-based",
+      "origami",
+      "microfluidic"
+    ],
+    "expectedProtocolKeywords": [
+      "whole blood",
+      "paper",
+      "microfluidic",
+      "antibody",
+      "calibration"
+    ],
+    "expectedMaterialsKeywords": [
+      "anti-crp",
+      "paper",
+      "electrode",
+      "whole blood",
+      "pbs"
+    ],
+    "expectedValidationKeywords": [
+      "limit of detection",
+      "calibration",
+      "whole blood",
+      "clinical",
+      "sensitivity"
+    ],
+    "notes": "Strong test of literature QC and point-of-care materials grounding."
+  },
+  {
+    "id": "diag-crp-electrochemical-2013",
+    "domain": "Diagnostics",
+    "title": "An optimised electrochemical biosensor for the label-free detection of C-reactive protein in blood",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/22809521/",
+    "doi": "10.1016/j.bios.2012.06.051",
+    "year": 2013,
+    "hypothesis": "An optimized label-free electrochemical immunosensor using anti-CRP capture chemistry on gold electrodes will detect C-reactive protein in blood with clinically relevant sensitivity and specificity suitable for translational assay development.",
+    "expectedNoveltySignals": [
+      "exact match found",
+      "similar work exists"
+    ],
+    "expectedReferenceKeywords": [
+      "c-reactive protein",
+      "electrochemical",
+      "label-free",
+      "blood",
+      "gold electrode"
+    ],
+    "expectedProtocolKeywords": [
+      "electrode",
+      "immobilization",
+      "impedance",
+      "crp",
+      "blood"
+    ],
+    "expectedMaterialsKeywords": [
+      "anti-crp",
+      "gold electrode",
+      "buffer",
+      "serum",
+      "impedance"
+    ],
+    "expectedValidationKeywords": [
+      "specificity",
+      "limit of detection",
+      "linear range",
+      "blood",
+      "impedance"
+    ],
+    "notes": "Good control for electrochemical supplier and validation realism."
+  },
+  {
+    "id": "gut-lgg-permeability-2019",
+    "domain": "Gut Health",
+    "title": "Lactobacillus rhamnosus GG treatment improves intestinal permeability and modulates microbiota dysbiosis in an experimental model of sepsis",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/30628657/",
+    "doi": "10.3892/ijmm.2019.4050",
+    "year": 2019,
+    "hypothesis": "Supplementing C57BL/6 mice with Lactobacillus rhamnosus GG for four weeks before challenge will reduce intestinal permeability relative to controls, measurable by FITC-dextran translocation and tight-junction protein preservation.",
+    "expectedNoveltySignals": [
+      "exact match found",
+      "similar work exists"
+    ],
+    "expectedReferenceKeywords": [
+      "lactobacillus rhamnosus gg",
+      "c57bl/6",
+      "fitc-dextran",
+      "intestinal permeability",
+      "tight junction"
+    ],
+    "expectedProtocolKeywords": [
+      "oral gavage",
+      "c57bl/6",
+      "fitc-dextran",
+      "ileum",
+      "control"
+    ],
+    "expectedMaterialsKeywords": [
+      "lactobacillus rhamnosus gg",
+      "fitc-dextran",
+      "c57bl/6",
+      "antibody",
+      "occludin"
+    ],
+    "expectedValidationKeywords": [
+      "fitc-dextran",
+      "occludin",
+      "claudin",
+      "histology",
+      "cytokine"
+    ],
+    "notes": "Benchmark for animal-study controls, timeline realism, and biological validation."
+  },
+  {
+    "id": "cell-trehalose-cryopreservation-2016",
+    "domain": "Cell Biology",
+    "title": "Freezing-induced uptake of trehalose into mammalian cells facilitates cryopreservation",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/27003129/",
+    "doi": "10.1016/j.bbamem.2016.03.020",
+    "year": 2016,
+    "hypothesis": "Replacing conventional sugar additives with trehalose in a mammalian-cell freezing workflow will improve post-thaw survival by facilitating intracellular protection during freezing and thawing compared with standard cryopreservation conditions.",
+    "expectedNoveltySignals": [
+      "exact match found",
+      "similar work exists"
+    ],
+    "expectedReferenceKeywords": [
+      "trehalose",
+      "cryopreservation",
+      "mammalian cells",
+      "freezing",
+      "thaw"
+    ],
+    "expectedProtocolKeywords": [
+      "cryovial",
+      "controlled-rate",
+      "thaw",
+      "viability",
+      "culture"
+    ],
+    "expectedMaterialsKeywords": [
+      "trehalose",
+      "dmso",
+      "fbs",
+      "cryovial",
+      "trypan blue"
+    ],
+    "expectedValidationKeywords": [
+      "post-thaw viability",
+      "trypan blue",
+      "proliferation",
+      "recovery",
+      "morphology"
+    ],
+    "notes": "Useful for detecting whether references stay on-domain or drift into unrelated cryobiology."
+  },
+  {
+    "id": "climate-sporomusa-2017",
+    "domain": "Climate",
+    "title": "Performance of different Sporomusa species for the microbial electrosynthesis of acetate from carbon dioxide",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/28279911/",
+    "doi": "10.1016/j.biortech.2017.02.128",
+    "year": 2017,
+    "hypothesis": "Introducing Sporomusa ovata into a bioelectrochemical microbial electrosynthesis system will convert CO2 into acetate at a higher rate than alternative Sporomusa species under controlled cathode-driven conditions.",
+    "expectedNoveltySignals": [
+      "exact match found",
+      "similar work exists"
+    ],
+    "expectedReferenceKeywords": [
+      "sporomusa ovata",
+      "microbial electrosynthesis",
+      "acetate",
+      "carbon dioxide",
+      "cathode"
+    ],
+    "expectedProtocolKeywords": [
+      "cathode",
+      "acetate",
+      "co2",
+      "anaerobic",
+      "bioelectrochemical"
+    ],
+    "expectedMaterialsKeywords": [
+      "sporomusa ovata",
+      "reactor",
+      "cathode",
+      "co2",
+      "electrolyte"
+    ],
+    "expectedValidationKeywords": [
+      "acetate",
+      "production rate",
+      "coulombic efficiency",
+      "gas chromatography",
+      "current"
+    ],
+    "notes": "Hardest benchmark for domain-specific grounding and realistic reactor planning."
+  }
+]

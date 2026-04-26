@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+/* ─── Dark mode (default) ───────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --background:       #0a0a0f;
+  --sidebar:          #0a0a0f;
+  --content-bg:       #0e0d16;
+  --surface-panel:    #111118;
+  --surface-elevated: #1e1e2e;
+  --surface-muted:    #13121b;
+  --surface-subtle:   #1f1f28;
+  --surface-hover:    #17171f;
+
+  /* Borders */
+  --border:           #1e1e2e;
+  --border-subtle:    #35343e;
+  --border-soft:      rgba(70, 69, 85, 0.92);
+  --border-strong:    rgba(145, 143, 161, 0.35);
+
+  /* Text */
+  --text-primary:     #e4e1ee;
+  --text-secondary:   #c7c4d8;
+  --text-tertiary:    #918fa1;
+  --text-muted:       #464555;
+  --text-faint:       #35343e;
+  --text-placeholder: #2e2d38;
+
+  /* Accent */
+  --accent-strong:    #6c63ff;
+  --accent-hover:     #5b54d6;
+  --accent-soft:      rgba(108, 99, 255, 0.12);
+  --accent-text:      #c4c0ff;
+  --accent-border:    rgba(108, 99, 255, 0.3);
+
+  /* Shadows */
+  --panel-shadow:     0 0 12px rgba(108, 99, 255, 0.12);
+  --inner-shadow:     inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+/* ─── Light mode ────────────────────────────────────────────── */
+/* Warm neutral palette — feels like a high-end lab notebook */
+:root[data-theme="light"] {
+  /* Backgrounds */
+  --background:       #f5f2ee;
+  --sidebar:          #ede9e3;
+  --content-bg:       #faf8f5;
+  --surface-panel:    #ffffff;
+  --surface-elevated: #e9e5de;
+  --surface-muted:    #f0ece6;
+  --surface-subtle:   #eae6df;
+  --surface-hover:    #e3dfd8;
+
+  /* Borders */
+  --border:           #ddd9d1;
+  --border-subtle:    #ccc8c0;
+  --border-soft:      rgba(120, 109, 95, 0.25);
+  --border-strong:    rgba(120, 109, 95, 0.4);
+
+  /* Text */
+  --text-primary:     #19171f;
+  --text-secondary:   #46425a;
+  --text-tertiary:    #6b6880;
+  --text-muted:       #908d9e;
+  --text-faint:       #b8b5c5;
+  --text-placeholder: #d2cfdc;
+
+  /* Accent — slightly deeper for contrast on light bg */
+  --accent-strong:    #5249e0;
+  --accent-hover:     #4540c8;
+  --accent-soft:      rgba(82, 73, 224, 0.09);
+  --accent-text:      #4540c8;
+  --accent-border:    rgba(82, 73, 224, 0.22);
+
+  /* Shadows */
+  --panel-shadow:     0 2px 20px rgba(100, 88, 70, 0.09);
+  --inner-shadow:     inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+/* ─── Base ──────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+html { background: var(--background); }
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-inter), sans-serif;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent-strong) 22%, transparent);
+  color: var(--text-primary);
+}
+
+/* ─── Generic panel class ───────────────────────────────────── */
+.panel {
+  border: 1px solid var(--border);
+  background: var(--surface-panel);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: var(--panel-shadow);
+}
+
+/* ─── Material Symbols ──────────────────────────────────────── */
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  font-family: "Material Symbols Outlined";
+  line-height: 1;
+  display: inline-block;
+  vertical-align: middle;
+  user-select: none;
+  text-transform: none;
+  letter-spacing: normal;
+  font-feature-settings: "liga";
+}
+
+/* ─── Animations ────────────────────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1;   }
+}
+@keyframes indeterminate-bar {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%);  }
+}
+@keyframes spin-slow {
+  from { transform: rotate(0deg);   }
+  to   { transform: rotate(360deg); }
+}
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+.anim-glow         { animation: pulse-glow 2s ease-in-out infinite; }
+.anim-spin-slow    { animation: spin-slow 3s linear infinite; }
+.spin-reverse      { animation-direction: reverse; }
+.progress-bar-anim { animation: indeterminate-bar 2s infinite linear; }
+.animate-fade-in   { animation: fade-in 0.2s ease-out; }
+
+/* ─── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  border-radius: 2px;
+}
