@@ -16,6 +16,7 @@ export async function POST(request: Request) {
   return NextResponse.json(
     await generateExperimentPlanner(
       hypothesis,
+      body.parsed,
       body.reviewMemory ?? [],
       body.labSettings,
     ),

@@ -8,38 +8,22 @@ const primaryJourney = [
   {
     href: "/",
     label: "Hypothesis",
-    icon: "lightbulb",
+    icon: "edit_note",
     exact: true,
-    hint: "Start with a scientific question",
+    hint: "Define the question",
   },
   {
     href: "/analyse",
-    label: "Analysis",
-    icon: "lan",
-    hint: "Literature QC and synthesis",
+    label: "Literature QC",
+    icon: "menu_book",
+    hint: "Check prior work",
   },
   {
     href: "/plan",
     label: "Experiment Plan",
     icon: "biotech",
-    hint: "Operational handoff draft",
+    hint: "Review runnable output",
   },
-  {
-    href: "/plan#review-feedback",
-    label: "Review & Improve",
-    icon: "rate_review",
-    hint: "Capture corrections for next run",
-  },
-];
-
-const workspaceTools = [
-  { href: "/dashboard", label: "History", icon: "dashboard" },
-  { href: "/literature", label: "Literature", icon: "menu_book" },
-  { href: "/results", label: "Results", icon: "analytics" },
-  { href: "/inventory", label: "Inventory", icon: "inventory_2" },
-  { href: "/protocols", label: "Protocols", icon: "description" },
-  { href: "/settings", label: "Lab Settings", icon: "settings" },
-  { href: "/logs", label: "System Logs", icon: "terminal" },
 ];
 
 interface SectionLink {
@@ -62,11 +46,17 @@ export default function SideNav({ sectionLinks, progress }: SideNavProps) {
       return;
     }
 
-    const syncHash = () => setHash(window.location.hash);
+    const syncHash = () => {
+      setHash(window.location.hash);
+    };
     syncHash();
     window.addEventListener("hashchange", syncHash);
-    return () => window.removeEventListener("hashchange", syncHash);
-  }, []);
+    window.addEventListener("popstate", syncHash);
+    return () => {
+      window.removeEventListener("hashchange", syncHash);
+      window.removeEventListener("popstate", syncHash);
+    };
+  }, [pathname]);
 
   const isActive = (href: string, exact?: boolean) => {
     if (href.includes("#")) {
@@ -82,11 +72,11 @@ export default function SideNav({ sectionLinks, progress }: SideNavProps) {
       {/* Brand block */}
       <div className="px-4 mb-6 flex items-center gap-2.5">
         <div className="w-7 h-7 rounded bg-[var(--surface-elevated)] flex items-center justify-center border border-[var(--text-muted)] shrink-0">
-          <span className="material-symbols-outlined text-[var(--accent-text)] text-[15px]">biotech</span>
+          <span className="material-symbols-outlined text-[var(--accent-text)] text-[15px]">science</span>
         </div>
         <div>
-          <h2 className="text-[var(--text-primary)] font-bold text-[12px] tracking-tight">Core Engine</h2>
-          <p className="text-[var(--text-tertiary)] font-mono text-[9px] normal-case tracking-normal">v1.0.0</p>
+          <h2 className="text-[var(--text-primary)] font-bold text-[12px] tracking-tight">Demo Journey</h2>
+          <p className="text-[var(--text-tertiary)] font-mono text-[9px] normal-case tracking-normal">3-step flow</p>
         </div>
       </div>
 
@@ -97,7 +87,7 @@ export default function SideNav({ sectionLinks, progress }: SideNavProps) {
           className="flex items-center justify-center gap-1.5 w-full bg-[var(--accent-strong)] hover:bg-[var(--accent-hover)] text-white font-semibold text-[11px] uppercase tracking-widest px-3 py-2 rounded transition-colors"
         >
           <span className="material-symbols-outlined text-[14px] normal-case tracking-normal">add</span>
-          New Experiment
+          New Run
         </Link>
       </div>
 
@@ -105,7 +95,7 @@ export default function SideNav({ sectionLinks, progress }: SideNavProps) {
       <nav className="flex-1 flex flex-col gap-0 px-2">
         <div className="mb-4">
           <p className="px-3 mb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-[var(--text-faint)]">
-            Primary Flow
+            Demo Flow
           </p>
           {primaryJourney.map((item, index) => {
             const active = isActive(item.href, item.exact);
@@ -131,29 +121,6 @@ export default function SideNav({ sectionLinks, progress }: SideNavProps) {
                     {item.hint}
                   </div>
                 </div>
-              </Link>
-            );
-          })}
-        </div>
-
-        <div className="mb-4">
-          <p className="px-3 mb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-[var(--text-faint)]">
-            Workspace Tools
-          </p>
-          {workspaceTools.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-2.5 px-3 py-1.5 text-[10px] uppercase tracking-widest font-semibold transition-colors duration-150 rounded ${
-                  active
-                    ? "bg-[var(--surface-panel)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
-                    : "text-[var(--text-muted)] hover:bg-[var(--surface-panel)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                <span className="material-symbols-outlined text-[14px] normal-case tracking-normal">{item.icon}</span>
-                {item.label}
               </Link>
             );
           })}
@@ -189,18 +156,6 @@ export default function SideNav({ sectionLinks, progress }: SideNavProps) {
           </div>
         </div>
       )}
-
-      {/* Footer links */}
-      <div className="flex flex-col gap-0.5 px-2 pt-3 border-t border-[var(--border)] mx-1">
-        <a className="flex items-center gap-2.5 px-3 py-1.5 rounded text-[var(--text-tertiary)] hover:bg-[var(--surface-panel)] hover:text-[var(--text-primary)] transition-colors text-[10px] uppercase tracking-widest font-semibold cursor-pointer">
-          <span className="material-symbols-outlined text-[14px] normal-case tracking-normal">help</span>
-          API Docs
-        </a>
-        <a className="flex items-center gap-2.5 px-3 py-1.5 rounded text-[var(--text-tertiary)] hover:bg-[var(--surface-panel)] hover:text-[var(--text-primary)] transition-colors text-[10px] uppercase tracking-widest font-semibold cursor-pointer">
-          <span className="material-symbols-outlined text-[14px] normal-case tracking-normal">contact_support</span>
-          Support
-        </a>
-      </div>
     </aside>
   );
 }

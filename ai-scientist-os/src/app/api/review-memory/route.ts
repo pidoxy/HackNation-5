@@ -5,11 +5,17 @@ import type { ReviewMemoryItem } from "@/lib/types";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const domain = url.searchParams.get("domain")?.trim().toLowerCase();
+  const experimentFamily = url.searchParams.get("experimentFamily")?.trim().toLowerCase();
   const memory = await listReviewMemory();
 
-  const filtered = domain
-    ? memory.filter((item) => item.domain.toLowerCase() === domain)
-    : memory;
+  const filtered = memory.filter((item) => {
+    const domainMatches = domain ? item.domain.toLowerCase() === domain : true;
+    const familyMatches = experimentFamily
+      ? (item.experimentFamily ?? "").toLowerCase() === experimentFamily
+      : true;
+
+    return domainMatches && familyMatches;
+  });
 
   return NextResponse.json({ items: filtered });
 }
@@ -26,9 +32,15 @@ export async function POST(request: Request) {
 
   const item: ReviewMemoryItem = {
     domain: body.domain,
+    experimentFamily: body.experimentFamily,
+    taskLabel: body.taskLabel,
+    systemContext: body.systemContext,
     section: body.section,
     issue: body.issue,
     impact: body.impact,
+    correction: body.correction,
+    importance: body.importance ?? "medium",
+    tags: body.tags ?? [],
     createdAt: body.createdAt,
   };
 

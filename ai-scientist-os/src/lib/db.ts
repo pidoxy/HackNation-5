@@ -31,13 +31,45 @@ function migrateLegacyJson(db: Database) {
       ) as ReviewMemoryItem[];
 
       const insert = db.prepare(`
-        INSERT INTO review_memory (domain, section, issue, impact, created_at)
-        VALUES (@domain, @section, @issue, @impact, @createdAt)
+        INSERT INTO review_memory (
+          domain,
+          experiment_family,
+          task_label,
+          system_context,
+          section,
+          issue,
+          impact,
+          correction,
+          importance,
+          tags_json,
+          created_at
+        )
+        VALUES (
+          @domain,
+          @experimentFamily,
+          @taskLabel,
+          @systemContext,
+          @section,
+          @issue,
+          @impact,
+          @correction,
+          @importance,
+          @tagsJson,
+          @createdAt
+        )
       `);
 
       const transaction = db.transaction((rows: ReviewMemoryItem[]) => {
         for (const row of rows) {
-          insert.run(row);
+          insert.run({
+            ...row,
+            experimentFamily: row.experimentFamily ?? null,
+            taskLabel: row.taskLabel ?? null,
+            systemContext: row.systemContext ?? null,
+            correction: row.correction ?? null,
+            importance: row.importance ?? "medium",
+            tagsJson: JSON.stringify(row.tags ?? []),
+          });
         }
       });
 
@@ -134,9 +166,15 @@ export function getDatabase() {
     CREATE TABLE IF NOT EXISTS review_memory (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       domain TEXT NOT NULL,
+      experiment_family TEXT,
+      task_label TEXT,
+      system_context TEXT,
       section TEXT NOT NULL,
       issue TEXT NOT NULL,
       impact TEXT NOT NULL,
+      correction TEXT,
+      importance TEXT,
+      tags_json TEXT,
       created_at TEXT NOT NULL
     );
 
@@ -165,6 +203,23 @@ export function getDatabase() {
       compliance_notes TEXT NOT NULL
     );
   `);
+
+  const reviewMemoryColumns = [
+    ["experiment_family", "TEXT"],
+    ["task_label", "TEXT"],
+    ["system_context", "TEXT"],
+    ["correction", "TEXT"],
+    ["importance", "TEXT"],
+    ["tags_json", "TEXT"],
+  ] as const;
+
+  for (const [column, type] of reviewMemoryColumns) {
+    try {
+      database.exec(`ALTER TABLE review_memory ADD COLUMN ${column} ${type};`);
+    } catch {
+      // Column already exists in upgraded local databases.
+    }
+  }
 
   migrateLegacyJson(database);
 

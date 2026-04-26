@@ -6,29 +6,13 @@ import { useEffect, useState } from "react";
 
 const PRIMARY_FLOW = [
   { href: "/", label: "Hypothesis", match: ["/"] },
-  { href: "/analyse", label: "Analysis", match: ["/analyse", "/literature"] },
-  { href: "/plan", label: "Plan", match: ["/plan"] },
-  { href: "/plan#review-feedback", label: "Review", match: ["/plan"], hash: "review-feedback" },
+  { href: "/analyse", label: "Literature QC", match: ["/analyse", "/literature"] },
+  { href: "/plan", label: "Experiment Plan", match: ["/plan"] },
 ] as Array<{ href: string; label: string; match: string[]; hash?: string }>;
-
-const SECONDARY_ROUTES = new Set([
-  "/dashboard",
-  "/inventory",
-  "/protocols",
-  "/settings",
-  "/logs",
-  "/results",
-]);
 
 export default function TopNav({ minimal = false }: { minimal?: boolean } = {}) {
   const pathname = usePathname();
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
-    if (typeof document === "undefined") {
-      return "dark";
-    }
-
-    return document.documentElement.dataset.theme === "light" ? "light" : "dark";
-  });
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [hash, setHash] = useState("");
 
   useEffect(() => {
@@ -36,11 +20,27 @@ export default function TopNav({ minimal = false }: { minimal?: boolean } = {}) 
       return;
     }
 
-    const syncHash = () => setHash(window.location.hash);
+    const storedTheme = localStorage.getItem("theme");
+    const resolvedTheme =
+      storedTheme === "light" || storedTheme === "dark"
+        ? storedTheme
+        : document.documentElement.dataset.theme === "light"
+          ? "light"
+          : "dark";
+    document.documentElement.dataset.theme = resolvedTheme;
+    setTheme(resolvedTheme);
+
+    const syncHash = () => {
+      setHash(window.location.hash);
+    };
     syncHash();
     window.addEventListener("hashchange", syncHash);
-    return () => window.removeEventListener("hashchange", syncHash);
-  }, []);
+    window.addEventListener("popstate", syncHash);
+    return () => {
+      window.removeEventListener("hashchange", syncHash);
+      window.removeEventListener("popstate", syncHash);
+    };
+  }, [pathname]);
 
   const toggleTheme = () => {
     const next: "dark" | "light" = theme === "dark" ? "light" : "dark";
@@ -48,8 +48,12 @@ export default function TopNav({ minimal = false }: { minimal?: boolean } = {}) 
     localStorage.setItem("theme", next);
     setTheme(next);
   };
-
-  const showPrimaryFlow = !minimal && !SECONDARY_ROUTES.has(pathname);
+  const currentStep =
+    pathname === "/analyse" || pathname === "/literature"
+      ? "Step 2 of 3"
+      : pathname === "/plan"
+        ? "Step 3 of 3"
+        : "Step 1 of 3";
 
   return (
     <header
@@ -67,52 +71,51 @@ export default function TopNav({ minimal = false }: { minimal?: boolean } = {}) 
         {!minimal && (
           <>
             <span className="text-[var(--text-muted)] mx-2 font-mono text-[11px]">|</span>
-            <span className="text-[var(--text-tertiary)] font-mono text-[11px] tracking-widest uppercase">Fulcrum Science</span>
+            <span className="text-[var(--text-tertiary)] font-mono text-[11px] tracking-widest uppercase">Demo Flow</span>
           </>
         )}
       </div>
 
       {!minimal && (
         <div className="hidden lg:flex items-center justify-center flex-1 min-w-0">
-          {showPrimaryFlow ? (
-            <nav
-              aria-label="Primary workflow"
-              className="flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-panel)]/80 px-2 py-1"
-            >
-              {PRIMARY_FLOW.map((item, index) => {
-                const active =
-                  item.hash != null
-                    ? pathname === "/plan" && hash === `#${item.hash}`
-                    : item.match.includes(pathname) && (item.hash == null || hash !== `#${item.hash}`);
+          <nav
+            aria-label="Primary workflow"
+            className="flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-panel)]/80 px-2 py-1"
+          >
+            {PRIMARY_FLOW.map((item, index) => {
+              const active =
+                item.hash != null
+                  ? pathname === "/plan" && hash === `#${item.hash}`
+                  : item.match.includes(pathname) && (item.hash == null || hash !== `#${item.hash}`);
 
-                return (
-                  <div key={item.label} className="flex items-center gap-1">
-                    <Link
-                      href={item.href}
-                      className={`px-3 py-1.5 rounded-full font-mono text-[10px] uppercase tracking-[0.18em] transition-colors ${
-                        active
-                          ? "bg-[var(--accent-strong)] text-white"
-                          : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)]"
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                    {index < PRIMARY_FLOW.length - 1 && (
-                      <span className="font-mono text-[10px] text-[var(--text-faint)] px-1">/</span>
-                    )}
-                  </div>
-                );
-              })}
-            </nav>
-          ) : (
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--text-muted)]">
-              Workspace Tools
-            </div>
-          )}
+              return (
+                <div key={item.label} className="flex items-center gap-1">
+                  <Link
+                    href={item.href}
+                    className={`px-3 py-1.5 rounded-full font-mono text-[10px] uppercase tracking-[0.18em] transition-colors ${
+                      active
+                        ? "bg-[var(--accent-strong)] text-white"
+                        : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)]"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                  {index < PRIMARY_FLOW.length - 1 && (
+                    <span className="font-mono text-[10px] text-[var(--text-faint)] px-1">/</span>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
         </div>
       )}
 
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
+        {!minimal && (
+          <span className="hidden md:block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
+            {currentStep}
+          </span>
+        )}
         <button
           onClick={toggleTheme}
           title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
@@ -122,18 +125,6 @@ export default function TopNav({ minimal = false }: { minimal?: boolean } = {}) 
             {theme === "dark" ? "light_mode" : "dark_mode"}
           </span>
         </button>
-        <button className="p-1.5 rounded transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)]">
-          <span className="material-symbols-outlined text-[18px]">notifications</span>
-        </button>
-        <button className="p-1.5 rounded transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)]">
-          <span className="material-symbols-outlined text-[18px]">settings</span>
-        </button>
-        <div
-          className="w-7 h-7 rounded-full border flex items-center justify-center ml-2"
-          style={{ background: "var(--surface-elevated)", borderColor: "var(--text-muted)" }}
-        >
-          <span className="material-symbols-outlined text-[14px] text-[var(--accent-text)]">person</span>
-        </div>
       </div>
     </header>
   );

@@ -61,6 +61,16 @@ function generateHypId() {
   return Math.random().toString(36).slice(2, 6).toUpperCase();
 }
 
+function summarizeMemoryMessage(items: ReviewMemoryItem[]): string | null {
+  const first = items[0];
+  if (!first) {
+    return null;
+  }
+
+  const detail = first.correction ?? first.issue;
+  return `Applied prior ${first.section.toLowerCase()} feedback: ${detail.slice(0, 56)}${detail.length > 56 ? "..." : ""}`;
+}
+
 export default function AnalysePage() {
   const router = useRouter();
   const [hypothesis] = useState(() =>
@@ -73,7 +83,12 @@ export default function AnalysePage() {
   const [refCount, setRefCount] = useState(0);
   const [references, setReferences] = useState<Reference[]>([]);
   const [literatureQc, setLiteratureQc] = useState<LiteratureQcSummary | null>(null);
+  const [experimentFamily, setExperimentFamily] = useState<string | null>(null);
+  const [routingConfidence, setRoutingConfidence] = useState<number | null>(null);
+  const [routingReason, setRoutingReason] = useState<string | null>(null);
+  const [routeSupported, setRouteSupported] = useState<boolean>(true);
   const [memoryCount, setMemoryCount] = useState(0);
+  const [memoryMessage, setMemoryMessage] = useState<string | null>(null);
   const [statusIdx, setStatusIdx] = useState(0);
   const [logLines, setLogLines] = useState<{ time: string; text: string }[]>([
     { time: new Date().toLocaleTimeString(), text: "> Initialising synthesis engine..." },
@@ -126,6 +141,11 @@ export default function AnalysePage() {
 
     const run = async () => {
       try {
+        const storedParsed =
+          typeof window !== "undefined" ? sessionStorage.getItem("parsed") : null;
+        const parsed =
+          storedParsed ? (JSON.parse(storedParsed) as ParseHypothesisResponse) : undefined;
+
         // Fetch prior review memory to incorporate into plan generation
         let reviewMemory: ReviewMemoryItem[] = [];
         try {
@@ -133,6 +153,7 @@ export default function AnalysePage() {
           const memData = await memRes.json();
           reviewMemory = memData.items ?? [];
           setMemoryCount(reviewMemory.length);
+          setMemoryMessage(summarizeMemoryMessage(reviewMemory));
           if (reviewMemory.length > 0) {
             setLogLines((prev) => [...prev, {
               time: new Date().toLocaleTimeString(),
@@ -144,7 +165,7 @@ export default function AnalysePage() {
         const res = await fetch("/api/generate-plan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hypothesis, reviewMemory }),
+          body: JSON.stringify({ hypothesis, parsed, reviewMemory }),
         });
         const data = (await res.json()) as GeneratePlanResponse & { error?: string };
 
@@ -160,6 +181,10 @@ export default function AnalysePage() {
         setRefCount(plan.references.length);
         setReferences(plan.references.slice(0, 3));
         setLiteratureQc(plan.literatureQc ?? null);
+        setExperimentFamily(plan.experimentFamily ?? null);
+        setRoutingConfidence(plan.routingConfidence ?? null);
+        setRoutingReason(plan.routingReason ?? null);
+        setRouteSupported(plan.routeSupported ?? true);
 
         // Store plan and hypothesis for plan page
         sessionStorage.setItem("plan", JSON.stringify(plan));
@@ -167,9 +192,13 @@ export default function AnalysePage() {
 
         // Auto-save to projects store so Dashboard shows real history
         const now = new Date().toISOString();
-        const parsed: ParseHypothesisResponse = {
+        const parsedForProject: ParseHypothesisResponse = parsed ?? {
           hypothesis,
           domain: plan.domain,
+          experimentFamily: plan.experimentFamily ?? "general_research",
+          routingConfidence: plan.routingConfidence ?? 0,
+          routingReason: plan.routingReason ?? "No routing rationale available.",
+          routeSupported: plan.routeSupported ?? false,
           readiness: plan.status ?? "ready",
           parsedFields: plan.parsedFields,
         };
@@ -180,7 +209,7 @@ export default function AnalysePage() {
           body: JSON.stringify({
             id: projectId,
             hypothesis,
-            parsed,
+            parsed: parsedForProject,
             plan,
             createdAt: now,
             updatedAt: now,
@@ -214,40 +243,32 @@ export default function AnalysePage() {
         <SideNav />
         <main className="flex-1 flex flex-col p-5 overflow-y-auto bg-[var(--surface-muted)]">
           <header className="mb-5">
-            <div className="flex items-start justify-between gap-4 mb-2">
-              <div className="flex items-center gap-2">
+            <div className="flex items-start justify-between gap-4 mb-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono text-[11px] text-[var(--accent-text)] px-2 py-0.5 bg-[var(--accent-text)]/10 border border-[var(--accent-border)]/20 rounded">
+                  Step 2 of 3
+                </span>
+                <span className="font-mono text-[11px] text-[var(--text-tertiary)] bg-[var(--surface-panel)] px-2 py-0.5 rounded">
                   ID: HYP-{hypId}
                 </span>
-                <span className="font-mono text-[11px] text-[var(--text-tertiary)]">/ ANALYSIS STAGE</span>
                 {memoryCount > 0 && (
                   <span className="font-mono text-[11px] text-emerald-400 px-2 py-0.5 bg-emerald-400/10 border border-emerald-400/20 rounded flex items-center gap-1">
                     <span className="material-symbols-outlined text-[12px]">psychology</span>
-                    {memoryCount} correction{memoryCount > 1 ? "s" : ""} applied
+                    {memoryMessage ?? `${memoryCount} correction${memoryCount > 1 ? "s" : ""} applied`}
                   </span>
                 )}
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {[
-                  { label: "STAGE 1", done: !loading },
-                  { label: "STAGE 2", done: !loading && planReady },
-                  { label: "STAGE 3", done: false },
-                ].map((stage, i, arr) => (
-                  <div key={stage.label} className="flex items-center gap-1">
-                    <div className="flex flex-col items-center gap-1">
-                      <div className={`w-2 h-2 rounded-full transition-colors ${stage.done ? "bg-[var(--accent-text)]" : "bg-[var(--border-subtle)]"}`} />
-                      <span className="font-mono text-[9px] uppercase tracking-widest text-[var(--text-muted)]">{stage.label}</span>
-                    </div>
-                    {i < arr.length - 1 && <div className="w-6 h-px bg-[var(--border-subtle)] mb-3" />}
-                  </div>
-                ))}
+                {experimentFamily ? (
+                  <span className="font-mono text-[11px] text-[var(--text-tertiary)] bg-[var(--surface-panel)] px-2 py-0.5 rounded">
+                    Route: {experimentFamily}
+                  </span>
+                ) : null}
               </div>
             </div>
             <h1 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text-primary)] leading-[1.2]">
-              Synthesis Engine Active
+              Literature QC and plan generation
             </h1>
             <p className="text-[13px] text-[var(--text-tertiary)] mt-1 max-w-2xl leading-[1.6] line-clamp-2">
-              Correlating proposed methodology against existing literature and generating preliminary protocol structures.
+              We first run a fast literature novelty check, return 1–3 follow-up references, and then generate the experiment plan.
             </p>
           </header>
 
@@ -266,7 +287,7 @@ export default function AnalysePage() {
               <div className="h-10 bg-[var(--surface-muted)] border-b border-[var(--border)] flex items-center justify-between px-4 shrink-0">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-[var(--text-tertiary)] text-[16px]">library_books</span>
-                  <span className="font-mono text-[11px] uppercase tracking-widest text-[var(--text-primary)]">Literature.Check</span>
+                  <span className="font-mono text-[11px] uppercase tracking-widest text-[var(--text-primary)]">Literature QC</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {loading ? (
@@ -314,6 +335,92 @@ export default function AnalysePage() {
                         </div>
                       </div>
                     ) : null}
+                    {planReady && routingConfidence !== null ? (
+                      <div className={`rounded border p-3 ${
+                        routeSupported && routingConfidence >= 60
+                          ? "border-emerald-400/20 bg-emerald-400/5"
+                          : "border-[#ffb785]/30 bg-[#ffb785]/5"
+                      }`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
+                            Experiment route
+                          </span>
+                          <span className="font-mono text-[11px] text-[var(--accent-text)]">
+                            {routingConfidence}% confidence
+                          </span>
+                        </div>
+                        <p className="mt-2 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+                          {routingReason ?? "No route rationale available."}
+                        </p>
+                      </div>
+                    ) : null}
+                    {planReady && (() => {
+                      const storedPlan =
+                        typeof window !== "undefined"
+                          ? sessionStorage.getItem("plan")
+                          : null;
+                      if (!storedPlan) return null;
+                      try {
+                        const parsedPlan = JSON.parse(storedPlan) as GeneratePlanResponse["plan"];
+                        const comparison = parsedPlan.historicalComparison;
+                        if (!comparison) return null;
+                        return (
+                          <div className="rounded border border-[var(--border)] bg-[var(--content-bg)] p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
+                                Past study benchmark
+                              </span>
+                              <span className="font-mono text-[10px] text-[var(--accent-text)] bg-[var(--accent-text)]/10 border border-[var(--accent-border)]/20 px-1.5 py-0.5 rounded">
+                                {comparison.verdict}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+                              {comparison.rationale}
+                            </p>
+                          </div>
+                        );
+                      } catch {
+                        return null;
+                      }
+                    })()}
+                    {references.some((reference) => reference.type === "protocol") ? (
+                      <div className="rounded border border-[var(--border)] bg-[var(--content-bg)] p-3">
+                        <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
+                          Protocol grounding
+                        </div>
+                        <div className="mt-2 space-y-2">
+                        {references
+                          .filter((reference) => reference.type === "protocol")
+                          .slice(0, 2)
+                          .map((reference) => (
+                            <div key={`${reference.doi}-protocol`} className="rounded border border-[var(--border)] bg-[var(--surface-muted)] p-2">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <span className="text-[11px] font-medium text-[var(--text-primary)]">
+                                    {reference.repository ?? reference.source}
+                                  </span>
+                                  <span className="font-mono text-[10px] text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-1.5 py-0.5 rounded">
+                                    {reference.provenanceLabel ?? "Protocol source"}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                                  {reference.title}
+                                </p>
+                                {reference.sourceUrl ? (
+                                  <a
+                                    href={reference.sourceUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="mt-2 inline-flex items-center gap-1 text-[10px] text-[var(--accent-text)] hover:underline"
+                                  >
+                                    Open source
+                                    <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                                  </a>
+                                ) : null}
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    ) : null}
                     {refCount > 0 ? (
                       <div className="flex flex-col gap-3">
                         <div className="flex items-center justify-between rounded border border-[var(--border)] bg-[var(--content-bg)] px-3 py-2">
@@ -332,17 +439,76 @@ export default function AnalysePage() {
                                 <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
                                   {reference.type}
                                 </div>
-                                <h3 className="mt-1 text-[12px] font-semibold leading-snug text-[var(--text-primary)]">
-                                  {reference.title}
-                                </h3>
+                                {reference.sourceUrl ? (
+                                  <a
+                                    href={reference.sourceUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="mt-1 inline-flex items-center gap-1 text-[12px] font-semibold leading-snug text-[var(--text-primary)] hover:text-[var(--accent-text)]"
+                                  >
+                                    {reference.title}
+                                    <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                                  </a>
+                                ) : (
+                                  <h3 className="mt-1 text-[12px] font-semibold leading-snug text-[var(--text-primary)]">
+                                    {reference.title}
+                                  </h3>
+                                )}
                               </div>
                               <span className="rounded border border-[var(--accent-border)]/30 bg-[var(--accent-text)]/10 px-2 py-1 font-mono text-[10px] text-[var(--accent-text)]">
                                 {reference.matchScore ?? 0}%
                               </span>
                             </div>
-                            <p className="mt-2 text-[11px] leading-relaxed text-[var(--text-secondary)]">
-                              {reference.matchRationale ?? reference.note}
-                            </p>
+                            <div className="mt-2 flex items-center gap-2 flex-wrap">
+                              {reference.venue ? (
+                                <span className="font-mono text-[10px] text-[var(--text-muted)]">
+                                  {reference.venue}
+                                </span>
+                              ) : null}
+                              {reference.publishedYear ? (
+                                <span className="font-mono text-[10px] text-[var(--text-muted)]">
+                                  {reference.publishedYear}
+                                </span>
+                              ) : null}
+                              <span className="font-mono text-[10px] text-[var(--text-muted)]">
+                                {reference.doi}
+                              </span>
+                            </div>
+                            <div className="mt-3 rounded border border-[var(--border)] bg-[var(--surface-muted)] p-2">
+                              <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">
+                                Why relevant
+                              </div>
+                              <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                                {reference.relevanceSummary ?? reference.matchRationale ?? reference.note}
+                              </p>
+                            </div>
+                            {reference.provenanceLabel || reference.repository ? (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {reference.provenanceLabel ? (
+                                  <span className="rounded border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-1 font-mono text-[10px] text-[var(--text-muted)]">
+                                    {reference.provenanceLabel}
+                                  </span>
+                                ) : null}
+                                {reference.repository ? (
+                                  <span className="rounded border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-1 font-mono text-[10px] text-[var(--text-muted)]">
+                                    {reference.repository}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
+                            <div className="mt-2 flex items-center gap-2 flex-wrap">
+                              {reference.sourceUrl ? (
+                                <a
+                                  href={reference.sourceUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] text-[var(--accent-text)] hover:underline"
+                                >
+                                  Open publication / source
+                                  <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                                </a>
+                              ) : null}
+                            </div>
                             {reference.matchedTerms?.length ? (
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {reference.matchedTerms.map((term) => (
@@ -375,10 +541,12 @@ export default function AnalysePage() {
               <div className="absolute -top-20 -right-20 w-48 h-48 bg-[var(--accent-text)]/5 rounded-full blur-[60px] pointer-events-none" />
               <div className="h-10 bg-[var(--surface-muted)] border-b border-[var(--border)] flex items-center justify-between px-4 z-10 shrink-0">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[var(--text-tertiary)] text-[16px]">build_circle</span>
-                  <span className="font-mono text-[11px] uppercase tracking-widest text-[var(--text-primary)]">Protocol.Generation</span>
+                  <span className="material-symbols-outlined text-[var(--text-tertiary)] text-[16px]">biotech</span>
+                  <span className="font-mono text-[11px] uppercase tracking-widest text-[var(--text-primary)]">Experiment Plan</span>
                 </div>
-                <span className="font-mono text-[13px] text-[var(--text-tertiary)]">NODE: ALPHA-7</span>
+                <span className="font-mono text-[11px] text-[var(--text-tertiary)]">
+                  {planReady ? "Ready to review" : "Generating"}
+                </span>
               </div>
 
               <div className="p-6 flex-1 flex flex-col justify-center items-center relative z-10">
@@ -406,7 +574,7 @@ export default function AnalysePage() {
                     )}
                   </div>
 
-                  <div ref={logRef} className="w-full bg-[var(--background)] border border-[var(--border)] rounded p-3 font-mono text-[10px] leading-relaxed h-36 overflow-y-auto relative">
+                  <div ref={logRef} className="w-full bg-[var(--background)] border border-[var(--border)] rounded p-3 font-mono text-[10px] leading-relaxed h-28 overflow-y-auto relative">
                     <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-[#0A0A0F] to-transparent z-10 pointer-events-none" />
                     {logLines.map((line, i) => (
                       <div key={i} style={{ opacity: Math.min(1, 0.4 + i * 0.1) }}
@@ -426,12 +594,16 @@ export default function AnalysePage() {
               <div className="p-4 border-t border-[var(--border)] bg-[var(--content-bg)] flex justify-end gap-3 z-10 shrink-0">
                 <button onClick={() => router.push("/")}
                   className="font-mono text-[11px] px-4 py-2 rounded border border-[var(--border)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-colors">
-                  ABORT
+                  Back
                 </button>
                 <button onClick={() => planReady && router.push("/plan")} disabled={loading || !planReady}
                   className="font-mono text-[11px] px-4 py-2 rounded bg-[var(--accent-text)] text-[#2000a4] font-semibold disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 hover:bg-[#8781ff] hover:text-white transition-colors">
-                  REVIEW PLAN
+                  Open Experiment Plan
                   <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                </button>
+                <button onClick={() => router.push("/literature")} disabled={loading}
+                  className="font-mono text-[11px] px-4 py-2 rounded border border-[var(--border)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                  Open Evidence Workspace
                 </button>
               </div>
             </div>

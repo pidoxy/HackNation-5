@@ -1,4 +1,5 @@
 import type {
+  HistoricalComparisonSummary,
   LiteratureQcSummary,
   NoveltySignal,
   ParseHypothesisResponse,
@@ -134,16 +135,22 @@ function includesTerm(text: string, term: string): boolean {
 }
 
 function referenceTypeBonus(reference: Reference): number {
+  const provenanceBonus =
+    reference.provenanceLabel === "Recommended protocol repository"
+      ? 8
+      : reference.provenanceLabel === "Official supplier resource"
+        ? 5
+        : 0;
   switch (reference.type) {
     case "similarity":
-      return 12;
+      return 12 + provenanceBonus;
     case "protocol":
-      return 8;
+      return 8 + provenanceBonus;
     case "conflict":
-      return 5;
+      return 5 + provenanceBonus;
     case "supplier":
     default:
-      return 2;
+      return 2 + provenanceBonus;
   }
 }
 
@@ -192,12 +199,17 @@ function scoreReference(
     matchedLabels.length > 0
       ? `Matches ${matchedLabels.join(", ")} terms from the hypothesis.`
       : "Low direct overlap with the hypothesis terms.";
+  const relevanceSummary =
+    matchedLabels.length > 0
+      ? `Relevant because it overlaps with the hypothesis ${matchedLabels.join(", ")} and can inform the proposed design.`
+      : reference.relevanceSummary ?? reference.note;
 
   return {
     ...reference,
     matchScore,
     matchedTerms: matchedTerms.slice(0, 6),
     matchRationale,
+    relevanceSummary,
   };
 }
 
@@ -223,6 +235,18 @@ function classifyNovelty(scoredReferences: Reference[]): NoveltySignal {
   return "not found";
 }
 
+function selectQcReferences(scoredReferences: Reference[]): Reference[] {
+  const ranked = [...scoredReferences].sort(
+    (left, right) => (right.matchScore ?? 0) - (left.matchScore ?? 0),
+  );
+  const primary = ranked.filter((reference) => reference.type !== "supplier");
+  const fallback = ranked.filter((reference) => reference.type === "supplier");
+
+  const picks = (primary.length > 0 ? primary : fallback).slice(0, 3);
+
+  return picks.length > 0 ? picks : ranked.slice(0, 3);
+}
+
 function buildQcRationale(signal: NoveltySignal, scoredReferences: Reference[]): string {
   const topReference = scoredReferences[0];
   const topScore = topReference?.matchScore ?? 0;
@@ -240,6 +264,87 @@ function buildQcRationale(signal: NoveltySignal, scoredReferences: Reference[]):
   }
 
   return `The retrieved references do not clear the similar-work threshold. The strongest nearby study scored ${topScore}% similarity, which keeps this hypothesis in the novel-work bucket.`;
+}
+
+function outcomeSignalForReference(
+  reference: Reference,
+): "aligned" | "mixed" | "conflicting" {
+  const text = normalize(`${reference.title} ${reference.note}`);
+
+  if (reference.type === "conflict" || includesTerm(text, "conflict") || includesTerm(text, "underperform") || includesTerm(text, "fails")) {
+    return "conflicting";
+  }
+
+  if (
+    includesTerm(text, "but") ||
+    includesTerm(text, "however") ||
+    includesTerm(text, "not specific") ||
+    includesTerm(text, "different") ||
+    includesTerm(text, "more aggressive")
+  ) {
+    return "mixed";
+  }
+
+  return "aligned";
+}
+
+export function buildHistoricalComparison(
+  references: Reference[],
+): HistoricalComparisonSummary {
+  const candidates = references
+    .filter((reference) => reference.type === "similarity" || reference.type === "conflict")
+    .slice(0, 3)
+    .map((reference) => {
+      const outcomeSignal = outcomeSignalForReference(reference);
+      const takeaway =
+        outcomeSignal === "aligned"
+          ? "Past study points in the same directional outcome as the current hypothesis."
+          : outcomeSignal === "mixed"
+            ? "Past study is related, but key conditions or outcomes differ enough to reduce confidence."
+            : "Past study suggests the result may diverge from the current hypothesis unless conditions are changed.";
+
+      return {
+        title: reference.title,
+        source: reference.source,
+        doi: reference.doi,
+        similarityScore: reference.matchScore ?? 0,
+        outcomeSignal,
+        takeaway,
+      };
+    });
+
+  if (candidates.length === 0) {
+    return {
+      verdict: "limited precedent",
+      rationale: "No closely related past study was strong enough to benchmark expected results against.",
+      items: [],
+    };
+  }
+
+  const alignedCount = candidates.filter((item) => item.outcomeSignal === "aligned").length;
+  const conflictingCount = candidates.filter((item) => item.outcomeSignal === "conflicting").length;
+
+  if (alignedCount >= 2 && conflictingCount === 0) {
+    return {
+      verdict: "likely similar",
+      rationale: "The strongest prior studies point in a similar direction, so the expected result should broadly resemble published precedent if the protocol is executed well.",
+      items: candidates,
+    };
+  }
+
+  if (conflictingCount > 0 || candidates.some((item) => item.outcomeSignal === "mixed")) {
+    return {
+      verdict: "mixed precedent",
+      rationale: "There is relevant prior work, but the published outcomes are mixed or condition-dependent, so the result may not fully match earlier studies.",
+      items: candidates,
+    };
+  }
+
+  return {
+    verdict: "limited precedent",
+    rationale: "There is some related literature, but not enough tightly matched precedent to predict that the result will closely mirror prior researchers' outcomes.",
+    items: candidates,
+  };
 }
 
 export function assessLiteratureQuality({
@@ -271,13 +376,15 @@ export function assessLiteratureQuality({
   const scoredReferences = references
     .map((reference) => scoreReference(reference, hydratedBuckets))
     .sort((left, right) => (right.matchScore ?? 0) - (left.matchScore ?? 0));
+  const qcReferences = selectQcReferences(scoredReferences);
 
-  const noveltySignal = classifyNovelty(scoredReferences);
-  const topReference = scoredReferences[0];
+  const noveltySignal = classifyNovelty(qcReferences);
+  const topReference = qcReferences[0];
   const decisionFactors = [
     `Top literature overlap: ${topReference?.matchScore ?? 0}%`,
     `Similar threshold: ${SIMILAR_MATCH_THRESHOLD}%`,
     `Exact threshold: ${EXACT_MATCH_THRESHOLD}%`,
+    `QC references returned: ${qcReferences.length}`,
   ];
 
   if (topReference?.matchedTerms?.length) {
@@ -286,7 +393,7 @@ export function assessLiteratureQuality({
 
   return {
     noveltySignal,
-    references: scoredReferences,
+    references: qcReferences,
     summary: {
       query:
         query ??
@@ -296,7 +403,7 @@ export function assessLiteratureQuality({
           ...hydratedBuckets.outcome,
           ...hydratedBuckets.control,
         ], 10).join(" "),
-      rationale: buildQcRationale(noveltySignal, scoredReferences),
+      rationale: buildQcRationale(noveltySignal, qcReferences),
       topMatchScore: topReference?.matchScore ?? 0,
       exactMatchThreshold: EXACT_MATCH_THRESHOLD,
       similarMatchThreshold: SIMILAR_MATCH_THRESHOLD,

@@ -1,6 +1,8 @@
 import type {
   ExperimentPlan,
+  ExperimentFamily,
   LabSettings,
+  ParsedHypothesisCore,
   ParseHypothesisResponse,
   RegenerableSection,
   ReviewMemoryItem,
@@ -108,28 +110,34 @@ async function callOpenAIStructured<T>({
 export async function parseHypothesisWithOpenAI(
   hypothesis: string,
   schema: object,
-): Promise<ParseHypothesisResponse> {
-  const parsed = await callOpenAIStructured<Omit<ParseHypothesisResponse, "hypothesis">>({
+  routeContext?: {
+    family: ExperimentFamily;
+    label: string;
+    reason: string;
+    guidance: string;
+  },
+): Promise<ParsedHypothesisCore> {
+  return callOpenAIStructured<ParsedHypothesisCore>({
     schemaName: "parsed_hypothesis",
     schema,
     input: [
       {
         role: "system",
         content:
-          "You are a scientific operations analyst. Extract the user's hypothesis into clear, practical experiment-planning fields. Prefer concrete, lab-usable phrasing.",
+          "You are a scientific operations analyst. Extract the user's hypothesis into clear, practical experiment-planning fields. Prefer concrete, route-aware phrasing that matches the actual experiment family.",
       },
       {
         role: "user",
-        content: `Hypothesis:\n${hypothesis}`,
+        content: [
+          `Hypothesis:\n${hypothesis}`,
+          routeContext
+            ? `\nRouter family: ${routeContext.label} (${routeContext.family})\nRouter reason: ${routeContext.reason}\nRoute guidance: ${routeContext.guidance}`
+            : "",
+          "\nInstructions:\n- Set the domain to a scientist-friendly label that matches the routed family.\n- For computational or imaging work, parsed fields should mention datasets, baselines, metrics, or simulation context rather than wet-lab reagents.\n- For wet-lab work, parsed fields should mention biological system, controls, and readouts rather than generic software terms.",
+        ].join("\n"),
       },
     ],
   });
-
-  return {
-    hypothesis,
-    generationMode: "live",
-    ...parsed,
-  };
 }
 
 export async function generatePlanWithOpenAI(
@@ -155,6 +163,9 @@ export async function generatePlanWithOpenAI(
           `Hypothesis:\n${hypothesis}`,
           `\nParsed fields:\n${JSON.stringify(parsedHypothesis.parsedFields, null, 2)}`,
           `\nDomain: ${parsedHypothesis.domain}`,
+          `\nExperiment family: ${parsedHypothesis.experimentFamily}`,
+          `\nRoute confidence: ${parsedHypothesis.routingConfidence}%`,
+          `\nRoute rationale: ${parsedHypothesis.routingReason}`,
           `\nEvidence:\n${referencesContext}`,
           `\nPrior scientist review memory:\n${
             reviewMemory.length > 0
@@ -162,7 +173,7 @@ export async function generatePlanWithOpenAI(
               : "No prior review memory for this experiment type."
           }`,
           `\nLab settings:\n${JSON.stringify(labSettings, null, 2)}`,
-          "\nRequirements:\n- Include realistic suppliers or source names when possible.\n- Budget and timeline must feel operational, not abstract.\n- Novelty signal should reflect the closeness of the supplied references.\n- Review feedback should sound like corrections a scientist would actually leave.\n- Preserve the exact biological system, matrix, organism, or reactor context from the hypothesis and evidence.\n- Validation must mirror the readouts implied by the evidence when available, such as FITC-dextran permeability, tight-junction markers, post-thaw viability, acetate production rate, coulombic efficiency, calibration curves, or limits of detection.\n- Materials must include the core assay-specific reagents and apparatus, not only generic consumables.",
+          "\nRequirements:\n- Include realistic suppliers or source names when possible.\n- Budget and timeline must feel operational, not abstract.\n- Novelty signal should reflect the closeness of the supplied references.\n- Review feedback should sound like corrections a scientist would actually leave.\n- Preserve the exact biological system, matrix, organism, reactor, imaging modality, or dataset context from the hypothesis and evidence.\n- Validation must mirror the readouts implied by the evidence when available, such as FITC-dextran permeability, tight-junction markers, post-thaw viability, acetate production rate, coulombic efficiency, calibration curves, SSIM, PSNR, RMSE, Dice, AUC, or downstream classifier accuracy.\n- Materials must include the core assay-specific reagents and apparatus, not only generic consumables.\n- If the hypothesis is computational, medical-imaging, radiology, computer-vision, or model-evaluation focused, do not invent animals, wet-lab assays, antibodies, or reagents. Use datasets, model baselines, GPUs, storage, annotation/review steps, and evaluation pipelines instead.\n- Prefer protocol grounding from protocols.io, Bio-protocol, Nature Protocols, JoVE, or OpenWetWare when wet-lab evidence is present.\n- Prefer method grounding from arXiv, PubMed, PMC, peer-reviewed venues, or official framework docs when the hypothesis is computational or imaging-focused.\n- Prefer supplier grounding from Thermo Fisher technical notes, Sigma-Aldrich technical bulletins, Promega, Qiagen, ATCC, Addgene, IDT, NVIDIA, PyTorch, MONAI, Kaggle, or other relevant official resources when appropriate.\n- For references, include a short relevanceSummary that explains in one sentence why each source matters to this hypothesis.\n- Add a designDecision section that explicitly justifies the selected model or assay setup.\n- Include multiple concrete alternatives ranked by rank=1,2,3... where lower rank is preferred as a first-pass experiment.\n- For each alternative, include costEstimate, timeEstimate, accuracyExpectation, estimatedSavings, and a rationale.\n- Include a budgetComparison showing the chosen approach cost, the cheapest alternative cost, the premium versus the cheapest option, and a short summary of why the premium is or is not justified.\n- If the plan uses animals, explain why cheaper options such as in vitro, organoid, ex vivo, dataset, or in silico approaches are insufficient for the primary endpoint.\n- Avoid defaulting to animal work unless the hypothesis or evidence truly requires whole-organism validation.\n- Avoid unrealistic concentrations, impossible timelines, incompatible assay readouts, or domain-mismatched materials.",
         ].join("\n"),
       },
     ],
@@ -208,6 +219,8 @@ export async function regeneratePlanSectionWithOpenAI<T>({
           `Section to regenerate: ${section}`,
           `\nHypothesis:\n${hypothesis}`,
           `\nParsed fields:\n${JSON.stringify(parsedHypothesis.parsedFields, null, 2)}`,
+          `\nExperiment family: ${parsedHypothesis.experimentFamily}`,
+          `\nRoute rationale: ${parsedHypothesis.routingReason}`,
           `\nCurrent plan context:\n${JSON.stringify(currentPlan, null, 2)}`,
           `\nEvidence:\n${referencesContext}`,
           `\nPrior scientist review memory:\n${
@@ -216,7 +229,7 @@ export async function regeneratePlanSectionWithOpenAI<T>({
               : "No prior review memory for this experiment type."
           }`,
           `\nLab settings:\n${JSON.stringify(labSettings, null, 2)}`,
-          "\nRequirements:\n- Keep the regenerated section consistent with the rest of the plan.\n- Preserve operational realism.\n- Prefer concrete supplier, cost, and sequencing details where relevant.\n- When regenerating validation or materials, preserve the assay-specific readouts and apparatus implied by the evidence rather than substituting generic laboratory text.",
+          "\nRequirements:\n- Keep the regenerated section consistent with the rest of the plan.\n- Preserve operational realism.\n- Prefer concrete supplier, cost, and sequencing details where relevant.\n- When regenerating validation or materials, preserve the assay-specific readouts and apparatus implied by the evidence rather than substituting generic laboratory text.\n- If the experiment is computational or imaging-focused, keep materials and budget centered on datasets, compute, storage, baselines, and evaluation rather than wet-lab items.\n- Prefer protocol grounding from the recommended protocol repositories when relevant wet-lab evidence is present.\n- Prefer arXiv, PubMed, PMC, and official framework documentation when the experiment is computational or medical-imaging focused.\n- Avoid unrealistic concentrations or impossible timing assumptions.\n- Preserve any design-decision logic already present in the current plan, especially any animal-model justification and cheaper alternatives considered.",
         ].join("\n"),
       },
     ],
